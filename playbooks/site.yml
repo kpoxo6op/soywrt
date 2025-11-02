@@ -1,0 +1,268 @@
+- hosts: home-router
+  gather_facts: false
+
+  # The role path supplies OpenWrt-aware modules like "uci" and "opkg"
+  roles:
+    - gekmihesg.openwrt
+
+  pre_tasks:
+    - name: Create on-box config backup
+      command: sysupgrade -v --create-backup /tmp/config-backup-ansible.tgz
+      changed_when: false
+
+    - name: Fetch backup to repository
+      fetch:
+        src: /tmp/config-backup-ansible.tgz
+        dest: backups/config-backup-ansible.tgz
+        flat: true
+
+    - name: Revert any pending unsaved UCI changes
+      command: uci -q revert
+      changed_when: false
+
+  tasks:
+    - name: Ensure package index is fresh
+      command: opkg update
+      changed_when: false
+
+    - name: Ensure Tailscale package present
+      opkg:
+        name: tailscale
+        state: present
+
+    - name: Enable tailscaled at boot
+      command: /etc/init.d/tailscaled enable
+      changed_when: false
+
+    - name: Start tailscaled
+      command: /etc/init.d/tailscaled start
+      changed_when: false
+
+    - name: Apply Tailscale flags idempotently
+      command: >
+        tailscale set
+        --ssh={{ tailscale_ssh | ternary('true','false') }}
+        --accept-dns={{ tailscale_accept_dns | ternary('true','false') }}
+        --accept-routes={{ tailscale_accept_routes | ternary('true','false') }}
+        --advertise-routes={{ tailscale_subnet_route }}
+      changed_when: false
+
+    - name: dnsmasq base options
+      uci:
+        command: set
+        key: dhcp.@dnsmasq[0]
+        value:
+          nonwildcard: "0"
+          localservice: "0"
+          rebind_protection: "1"
+          local_ttl: "{{ dns_local_ttl }}"
+
+    - name: Ensure dnsmasq not bound to a single interface
+      uci:
+        command: delete
+        key: dhcp.@dnsmasq[0].interface
+      ignore_errors: true
+
+    - name: Normalize upstream DNS servers once
+      block:
+        - uci:
+            command: delete
+            key: dhcp.@dnsmasq[0].server
+          ignore_errors: true
+        - uci:
+            command: add_list
+            key: dhcp.@dnsmasq[0].server
+            value: "{{ item }}"
+          loop: "{{ dns_upstreams }}"
+      when: onboard_once | default(false)
+
+    - name: Normalize address overrides once
+      block:
+        - uci:
+            command: delete
+            key: dhcp.@dnsmasq[0].address
+          ignore_errors: true
+        - uci:
+            command: add_list
+            key: dhcp.@dnsmasq[0].address
+            value: "/{{ domain }}/{{ wildcard_target }}"
+        - uci:
+            command: add_list
+            key: dhcp.@dnsmasq[0].address
+            value: "/torrent.{{ domain }}/{{ torrent_target }}"
+      when: onboard_once | default(false)
+
+    - name: Normalize rebind_domain once
+      block:
+        - uci:
+            command: delete
+            key: dhcp.@dnsmasq[0].rebind_domain
+          ignore_errors: true
+        - uci:
+            command: add_list
+            key: dhcp.@dnsmasq[0].rebind_domain
+          value: "{{ domain }}"
+      when: onboard_once | default(false)
+
+    - name: LAN DHCP scope
+      uci:
+        command: set
+        key: dhcp.lan
+        value:
+          start: "{{ dhcp.lan.start }}"
+          limit: "{{ dhcp.lan.limit }}"
+          leasetime: "{{ dhcp.lan.leasetime }}"
+
+    - name: Static DHCP leases
+      loop: "{{ static_leases }}"
+      loop_control:
+        loop_var: lease
+      uci:
+        command: section
+        config: dhcp
+        type: host
+        find_by:
+          name: "{{ lease.name }}"
+        value:
+          name: "{{ lease.name }}"
+          mac: "{{ lease.mac }}"
+          ip: "{{ lease.ip }}"
+
+    - name: Radio 2G base
+      uci:
+        command: set
+        key: wireless."{{ wifi2.device }}"
+        value:
+          channel: "{{ wifi2.channel }}"
+          htmode: "{{ wifi2.htmode }}"
+
+    - name: Radio 5G base
+      uci:
+        command: set
+        key: wireless."{{ wifi5.device }}"
+        value:
+          channel: "{{ wifi5.channel }}"
+          htmode: "{{ wifi5.htmode }}"
+
+    - name: 2G SSID
+      uci:
+        command: section
+        config: wireless
+        type: wifi-iface
+        find_by:
+          device: "{{ wifi2.device }}"
+          mode: ap
+          ssid: "{{ wifi2.ssid }}"
+        value:
+          device: "{{ wifi2.device }}"
+          mode: ap
+          network: lan
+          ssid: "{{ wifi2.ssid }}"
+          encryption: "{{ wifi2.encryption }}"
+          key: "{{ wifi2.key }}"
+
+    - name: 5G SSID
+      uci:
+        command: section
+        config: wireless
+        type: wifi-iface
+        find_by:
+          device: "{{ wifi5.device }}"
+          mode: ap
+          ssid: "{{ wifi5.ssid }}"
+        value:
+          device: "{{ wifi5.device }}"
+          mode: ap
+          network: lan
+          ssid: "{{ wifi5.ssid }}"
+          encryption: "{{ wifi5.encryption }}"
+          key: "{{ wifi5.key }}"
+
+    - name: Tailscale zone
+      uci:
+        command: section
+        config: firewall
+        type: zone
+        find_by:
+          name: tailscale
+        value:
+          name: tailscale
+          input: ACCEPT
+          output: ACCEPT
+          forward: ACCEPT
+          device: tailscale0
+
+    - name: Forward tailscale to lan
+      uci:
+        command: section
+        config: firewall
+        type: forwarding
+        find_by:
+          src: tailscale
+          dest: lan
+        value:
+          src: tailscale
+          dest: lan
+
+    - name: Port forward http to cluster
+      uci:
+        command: section
+        config: firewall
+        type: redirect
+        find_by:
+          name: http_ingress
+        value:
+          name: http_ingress
+          src: wan
+          src_dport: "80"
+          dest: lan
+          dest_ip: "{{ k8s_ingress_ip }}"
+          dest_port: "80"
+          proto: tcp
+          target: DNAT
+
+    - name: Port forward https to cluster
+      uci:
+        command: section
+        config: firewall
+        type: redirect
+        find_by:
+          name: https_ingress
+        value:
+          name: https_ingress
+          src: wan
+          src_dport: "443"
+          dest: lan
+          dest_ip: "{{ k8s_ingress_ip }}"
+          dest_port: "443"
+          proto: tcp
+          target: DNAT
+
+    - name: Commit UCI changes
+      uci:
+        command: commit
+      notify:
+        - reload network
+        - reload wifi
+        - reload firewall
+        - restart dnsmasq
+
+  handlers:
+    - name: reload network
+      command: /etc/init.d/network reload
+      notify: wait for reconnect
+
+    - name: reload wifi
+      command: wifi reload
+      notify: wait for reconnect
+
+    - name: reload firewall
+      command: /etc/init.d/firewall reload
+
+    - name: restart dnsmasq
+      command: /etc/init.d/dnsmasq restart
+
+    - name: wait for reconnect
+      wait_for_connection:
+        timeout: 300
+        delay: 5

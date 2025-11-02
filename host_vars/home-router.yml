@@ -1,0 +1,50 @@
+# Domain and DNS
+domain: soyspray.vip
+wildcard_target: 192.168.1.20
+torrent_target: 192.168.1.39
+dns_local_ttl: "30"
+dns_upstreams:
+  - 1.1.1.1
+  - 8.8.8.8
+
+# Tailscale behavior on an already logged in node
+tailscale_accept_dns: false
+tailscale_accept_routes: true
+tailscale_subnet_route: 192.168.1.0/24
+tailscale_ssh: true
+
+# DHCP
+dhcp:
+  lan:
+    start: "100"
+    limit: "150"
+    leasetime: "12h"
+
+# Static DHCP leases
+static_leases:
+  - name: node-0
+    mac: "98:fa:9b:12:9d:6d"
+    ip: "192.168.1.10"
+
+# Wi‑Fi SSIDs
+wifi2:
+  device: radio0
+  ssid: "123AAotea"
+  channel: "1"
+  htmode: "HE20"
+  encryption: "psk2+ccmp"
+  key: "set-me"
+
+wifi5:
+  device: radio1
+  ssid: "123AAotea_5G"
+  channel: "36"
+  htmode: "HE80"
+  encryption: "psk2+ccmp"
+  key: "set-me"
+
+# Ingress target in the LAN
+k8s_ingress_ip: 192.168.1.20
+
+# Run normalization tasks once to adopt manual changes
+onboard_once: true
