@@ -1,6 +1,6 @@
+.vault_pass
 backups/
 roles/
 *.retry
 *.tgz
-venv/
-.vault_pass
+*.txt

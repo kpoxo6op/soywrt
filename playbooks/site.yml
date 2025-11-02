@@ -1,7 +1,8 @@
 - hosts: home-router
   gather_facts: false
+  vars_files:
+    - host_vars/secrets.yml
 
-  # The role path supplies OpenWrt-aware modules like "uci" and "opkg"
   roles:
     - gekmihesg.openwrt
 
@@ -16,9 +17,20 @@
         dest: backups/config-backup-ansible.tgz
         flat: true
 
-    - name: Revert any pending unsaved UCI changes
-      command: uci -q revert
+    - name: Revert pending UCI changes for dhcp
+      command: uci -q revert dhcp
       changed_when: false
+      ignore_errors: true
+
+    - name: Revert pending UCI changes for firewall
+      command: uci -q revert firewall
+      changed_when: false
+      ignore_errors: true
+
+    - name: Revert pending UCI changes for wireless
+      command: uci -q revert wireless
+      changed_when: false
+      ignore_errors: true
 
   tasks:
     - name: Ensure package index is fresh
@@ -101,7 +113,7 @@
         - uci:
             command: add_list
             key: dhcp.@dnsmasq[0].rebind_domain
-          value: "{{ domain }}"
+            value: "{{ domain }}"
       when: onboard_once | default(false)
 
     - name: LAN DHCP scope
