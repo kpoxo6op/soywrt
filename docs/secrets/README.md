@@ -1,8 +1,10 @@
 # OpenWrt Secrets
 
+**CRITICAL:** Store vault password in password manager - it's the master key!
+
 ```bash
-# Setup vault password
-echo "your-password-here" > .vault_pass
+# Setup vault password (use strong unique password from manager)
+echo "password-from-manager" > .vault_pass
 chmod 600 .vault_pass
 
 # Edit encrypted secrets
