@@ -1,7 +1,7 @@
 - hosts: home-router
   gather_facts: false
   vars_files:
-    - host_vars/secrets.yml
+    - ../host_vars/secrets.yml
 
   roles:
     - gekmihesg.openwrt

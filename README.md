@@ -7,16 +7,12 @@ Declarative OpenWrt configuration and automation for the soy home network
 1. Install the OpenWrt role into `roles`
 
 ```
-cd /home/boris/code/soywrt
-source venv/bin/activate
 ansible-galaxy role install -p roles -r requirements.yml
 ```
 
 2. Create a vault password file then add secrets
 
 ```
-cd /home/boris/code/soywrt
-source venv/bin/activate
 echo "set-strong-password" > .vault_pass
 chmod 600 .vault_pass
 ansible-vault edit host_vars/secrets.yml
@@ -32,8 +28,6 @@ wifi5_key: "replace-with-5g-psk"
 3. First run
 
 ```
-cd /home/boris/code/soywrt
-source venv/bin/activate
 ansible-playbook playbooks/site.yml --check --diff
 ansible-playbook playbooks/site.yml
 ```
