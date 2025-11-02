@@ -7,14 +7,20 @@
 echo "password-from-manager" > .vault_pass
 chmod 600 .vault_pass
 
-# Edit encrypted secrets
+# Edit encrypted secrets (activate venv first)
+cd /home/boris/code/soywrt
+source venv/bin/activate
 ansible-vault edit host_vars/secrets.yml
 
-# Run playbooks
+# Run playbooks (activate venv first)
+cd /home/boris/code/soywrt
+source venv/bin/activate
 ansible-playbook playbooks/site.yml --check --diff
 ansible-playbook playbooks/site.yml
 
-# Other commands
+# Other commands (activate venv first)
+cd /home/boris/code/soywrt
+source venv/bin/activate
 ansible-vault view host_vars/secrets.yml
 ansible-vault rekey host_vars/secrets.yml
 ```
