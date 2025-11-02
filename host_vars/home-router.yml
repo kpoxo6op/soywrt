@@ -33,7 +33,7 @@ wifi2:
   channel: "1"
   htmode: "HE20"
   encryption: "psk2+ccmp"
-  key: "set-me"
+  key: "{{ wifi2_key }}"
 
 wifi5:
   device: radio1
@@ -41,7 +41,7 @@ wifi5:
   channel: "36"
   htmode: "HE80"
   encryption: "psk2+ccmp"
-  key: "set-me"
+  key: "{{ wifi5_key }}"
 
 # Ingress target in the LAN
 k8s_ingress_ip: 192.168.1.20

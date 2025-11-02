@@ -2,3 +2,5 @@ backups/
 roles/
 *.retry
 *.tgz
+venv/
+.vault_pass
