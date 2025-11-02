@@ -4,3 +4,5 @@ roles/
 *.retry
 *.tgz
 *.txt
+venv/
+
